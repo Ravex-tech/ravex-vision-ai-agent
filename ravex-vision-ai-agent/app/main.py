@@ -7,15 +7,25 @@ from app.vision.face_identity import FaceIdentity
 
 WINDOW_NAME = "RAVEX VISION AI"
 
+# Run expensive InsightFace inference only once every N frames.
+RECOGNITION_INTERVAL = 10
+
 
 def main():
     camera = Camera()
     camera.start()
+
     face_identity = FaceIdentity(
         similarity_threshold=0.45
     )
 
-    previous_time = time.time()
+    frame_count = 0
+    identities = []
+
+    previous_time = time.perf_counter()
+
+    # Smoothed FPS instead of unstable single-frame FPS.
+    smoothed_fps = 0.0
 
     try:
         while True:
@@ -25,23 +35,41 @@ def main():
                 print("Unable to read camera frame.")
                 break
 
-            identities = face_identity.identify(frame)
+            frame_count += 1
 
-            current_time = time.time()
+            # -------------------------------------------------
+            # EXPENSIVE AI INFERENCE
+            # Only run InsightFace periodically.
+            # -------------------------------------------------
+            if (
+                frame_count == 1
+                or frame_count % RECOGNITION_INTERVAL == 0
+            ):
+                identities = face_identity.identify(frame)
 
+            # -------------------------------------------------
+            # FPS calculation
+            # -------------------------------------------------
+            current_time = time.perf_counter()
             elapsed = current_time - previous_time
-
-            fps = (
-                1 / elapsed
-                if elapsed > 0
-                else 0
-            )
-
             previous_time = current_time
 
+            if elapsed > 0:
+                current_fps = 1.0 / elapsed
+
+                if smoothed_fps == 0:
+                    smoothed_fps = current_fps
+                else:
+                    smoothed_fps = (
+                        0.90 * smoothed_fps
+                        + 0.10 * current_fps
+                    )
+
+            # -------------------------------------------------
+            # Draw identities from latest recognition result.
+            # -------------------------------------------------
             for identity in identities:
                 x, y, width, height = identity["bbox"]
-
                 person_id = identity["person_id"]
 
                 cv2.rectangle(
@@ -62,6 +90,9 @@ def main():
                     2,
                 )
 
+            # -------------------------------------------------
+            # UI
+            # -------------------------------------------------
             cv2.putText(
                 frame,
                 "RAVEX VISION AI",
@@ -74,7 +105,7 @@ def main():
 
             cv2.putText(
                 frame,
-                f"FPS: {fps:.1f}",
+                f"FPS: {smoothed_fps:.1f}",
                 (20, 70),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
@@ -90,6 +121,16 @@ def main():
                 0.7,
                 (255, 255, 255),
                 2,
+            )
+
+            cv2.putText(
+                frame,
+                f"Recognition: 1/{RECOGNITION_INTERVAL} frames",
+                (20, 130),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (255, 255, 255),
+                1,
             )
 
             cv2.imshow(
@@ -115,13 +156,13 @@ def main():
         print("Application interrupted by user.")
 
     finally:
-      try:
-          camera.release()
-      except Exception:
-          pass
+        try:
+            camera.release()
+        except Exception:
+            pass
 
-      cv2.destroyAllWindows()
-      print("Camera released successfully.")
+        cv2.destroyAllWindows()
+        print("Camera released successfully.")
 
 
 if __name__ == "__main__":
