@@ -1,39 +1,47 @@
 import cv2
+import time
 
-from app.config import settings
 from app.vision.camera import Camera
-from app.vision.face_detector import FaceDetector
-from app.vision.face_tracker import FaceTracker
+from app.vision.face_identity import FaceIdentity
 
 
-WINDOW_NAME = "Ravex Vision AI Agent"
+WINDOW_NAME = "RAVEX VISION AI"
 
 
-def run() -> None:
+def main():
     camera = Camera()
-    face_detector = FaceDetector()
-    face_tracker = FaceTracker()
+    face_identity = FaceIdentity(
+        similarity_threshold=0.45
+    )
+
+    previous_time = time.time()
 
     try:
-        camera.start()
-
-        cv2.namedWindow(
-            WINDOW_NAME,
-            cv2.WINDOW_NORMAL,
-        )
-
-        print(f"{settings.APP_NAME} started.")
-        print("Press 'q' in the video window to quit.")
-
         while True:
             frame = camera.read()
 
-            faces = face_detector.detect(frame)
+            if frame is None:
+                print("Unable to read camera frame.")
+                break
 
-            tracks = face_tracker.update(faces)
+            identities = face_identity.identify(frame)
 
-            for track in tracks:
-                x, y, width, height = track.bbox
+            current_time = time.time()
+
+            elapsed = current_time - previous_time
+
+            fps = (
+                1 / elapsed
+                if elapsed > 0
+                else 0
+            )
+
+            previous_time = current_time
+
+            for identity in identities:
+                x, y, width, height = identity["bbox"]
+
+                person_id = identity["person_id"]
 
                 cv2.rectangle(
                     frame,
@@ -45,46 +53,40 @@ def run() -> None:
 
                 cv2.putText(
                     frame,
-                    f"Person {track.track_id:02d}",
-                    (x, max(y - 10, 20)),
+                    f"Person {person_id:02d}",
+                    (x, max(y - 10, 25)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.7,
                     (255, 255, 255),
                     2,
                 )
 
-            # Calculate FPS
-            fps = camera.calculate_fps()
-
-            # Display application name
             cv2.putText(
                 frame,
                 "RAVEX VISION AI",
-                (20, 40),
+                (20, 35),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                1,
+                0.9,
                 (255, 255, 255),
                 2,
             )
 
-            # Display FPS
             cv2.putText(
                 frame,
                 f"FPS: {fps:.1f}",
-                (20, 80),
+                (20, 70),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
+                0.7,
                 (255, 255, 255),
                 2,
             )
 
-            # Display number of detected faces
             cv2.putText(
                 frame,
-                f"Persons: {len(tracks)}",
-                (20, 115),
+                f"Persons: {len(identities)}",
+                (20, 100),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
+                0.7,
                 (255, 255, 255),
                 2,
             )
@@ -94,33 +96,28 @@ def run() -> None:
                 frame,
             )
 
-            # Exit using Q
             key = cv2.waitKey(1) & 0xFF
 
             if key == ord("q"):
                 break
 
-            # Exit when user closes the window using X
-            try:
-                window_visible = cv2.getWindowProperty(
+            if (
+                cv2.getWindowProperty(
                     WINDOW_NAME,
                     cv2.WND_PROP_VISIBLE,
                 )
-
-                if window_visible < 1:
-                    break
-
-            except cv2.error:
+                < 1
+            ):
                 break
 
     except KeyboardInterrupt:
-        print("\nApplication interrupted by user.")
+        print("Application interrupted by user.")
 
     finally:
-        camera.stop()
+        camera.release()
         cv2.destroyAllWindows()
         print("Camera released successfully.")
 
 
 if __name__ == "__main__":
-    run()
+    main()
