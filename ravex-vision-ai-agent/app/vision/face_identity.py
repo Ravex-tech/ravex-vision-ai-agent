@@ -13,7 +13,7 @@ class FaceIdentity:
 
         self.model.prepare(
             ctx_id=-1,
-            det_size=(640, 640),
+            det_size=(320, 320),
         )
 
         self.known_identities: dict[int, np.ndarray] = {}
