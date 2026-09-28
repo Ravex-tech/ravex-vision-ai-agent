@@ -10,6 +10,7 @@ WINDOW_NAME = "RAVEX VISION AI"
 
 def main():
     camera = Camera()
+    camera.start()
     face_identity = FaceIdentity(
         similarity_threshold=0.45
     )
@@ -114,9 +115,13 @@ def main():
         print("Application interrupted by user.")
 
     finally:
-        camera.release()
-        cv2.destroyAllWindows()
-        print("Camera released successfully.")
+      try:
+          camera.release()
+      except Exception:
+          pass
+
+      cv2.destroyAllWindows()
+      print("Camera released successfully.")
 
 
 if __name__ == "__main__":
