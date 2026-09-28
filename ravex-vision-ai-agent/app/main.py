@@ -3,6 +3,7 @@ import cv2
 from app.config import settings
 from app.vision.camera import Camera
 from app.vision.face_detector import FaceDetector
+from app.vision.face_tracker import FaceTracker
 
 
 WINDOW_NAME = "Ravex Vision AI Agent"
@@ -11,6 +12,7 @@ WINDOW_NAME = "Ravex Vision AI Agent"
 def run() -> None:
     camera = Camera()
     face_detector = FaceDetector()
+    face_tracker = FaceTracker()
 
     try:
         camera.start()
@@ -26,11 +28,29 @@ def run() -> None:
         while True:
             frame = camera.read()
 
-            # Detect faces
             faces = face_detector.detect(frame)
 
-            # Draw face bounding boxes
-            face_detector.draw(frame, faces)
+            tracks = face_tracker.update(faces)
+
+            for track in tracks:
+                x, y, width, height = track.bbox
+
+                cv2.rectangle(
+                    frame,
+                    (x, y),
+                    (x + width, y + height),
+                    (255, 255, 255),
+                    2,
+                )
+
+                cv2.putText(
+                    f"Person {track.track_id:02d}",
+                    (x, max(y - 10, 20)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (255, 255, 255),
+                    2,
+                )
 
             # Calculate FPS
             fps = camera.calculate_fps()
@@ -60,7 +80,7 @@ def run() -> None:
             # Display number of detected faces
             cv2.putText(
                 frame,
-                f"Faces: {len(faces)}",
+                f"Persons: {len(tracks)}",
                 (20, 115),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
