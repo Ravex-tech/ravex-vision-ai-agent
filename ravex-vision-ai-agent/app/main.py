@@ -44,6 +44,7 @@ def run() -> None:
                 )
 
                 cv2.putText(
+                    frame,
                     f"Person {track.track_id:02d}",
                     (x, max(y - 10, 20)),
                     cv2.FONT_HERSHEY_SIMPLEX,
